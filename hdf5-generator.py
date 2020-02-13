@@ -407,6 +407,10 @@ if __name__ == '__main__':
                         desc=('Creating HDF5 Dataset for %s jets' % jet_type))
 
     for index, file_dict in enumerate(files_details):
+
+        if index > 1:
+            continue
+
         dataset_size = int((index+1)*batch_size)-int((index)*batch_size)
 
         generator = HDF5Generator(
