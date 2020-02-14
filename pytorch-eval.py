@@ -10,13 +10,14 @@ import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 import sys
 
+
 def voc_ap(rec, prec):
     mrec = np.concatenate(([0.], rec, [1.]))
     mpre = np.concatenate(([0.], prec, [0.]))
 
     # compute the precision envelope
     for i in range(mpre.size - 1, 0, -1):
-      mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
+        mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
 
     # to calculate area under PR curve, look for points
     # where X axis (recall) changes value
@@ -26,11 +27,11 @@ def voc_ap(rec, prec):
     return ap
 
 
-def test_net(model, dataset, top_k, im_size=(300,300),
+def test_net(model, dataset, top_k, im_size=(300, 300),
              conf_threshold=0.05, overlap_threshold=0.1):
 
-    results = np.empty((0,3))
-    results2 = np.empty((0,3))
+    results = np.empty((0, 3))
+    results2 = np.empty((0, 3))
 
     with torch.no_grad():
         for data, targets in dataset:
@@ -43,12 +44,12 @@ def test_net(model, dataset, top_k, im_size=(300,300),
             targets[:, 1] *= im_size[1]
             targets[:, 3] *= im_size[1]
 
-            agg_detections = np.empty((0,6))
+            agg_detections = np.empty((0, 6))
             for j in range(1, detections.size(1)):
                 dets = detections[0, j, :]
 
                 # Filter detections above given threshold
-                dets = dets[dets[:,0] > conf_threshold]
+                dets = dets[dets[:, 0] > conf_threshold]
 
                 if dets.size(0) == 0:
                     continue
@@ -63,13 +64,14 @@ def test_net(model, dataset, top_k, im_size=(300,300),
                 labels = np.array([j]*len(scores))
 
                 class_det = np.hstack((boxes.cpu().numpy(),
-                                       labels[:,np.newaxis],
-                                       scores[:, np.newaxis])).astype(np.float32, copy=False)
-                
+                                       labels[:, np.newaxis],
+                                       scores[:, np.newaxis])
+                                      ).astype(np.float32, copy=False)
+
                 agg_detections = np.vstack((agg_detections, class_det))
 
             # Sort by confidence
-            agg_detections = agg_detections[(-agg_detections[:,-1]).argsort()]
+            agg_detections = agg_detections[(-agg_detections[:, -1]).argsort()]
 
             # Select top k predictions
             agg_detections = agg_detections[:top_k]
@@ -77,7 +79,7 @@ def test_net(model, dataset, top_k, im_size=(300,300),
             # Loop over agg_detections
             for d in agg_detections:
 
-                detected = 0 
+                detected = 0
                 # Check the overlap
                 ixmin = np.maximum(targets[:, 0], d[0])
                 iymin = np.maximum(targets[:, 1], d[1])
@@ -89,13 +91,14 @@ def test_net(model, dataset, top_k, im_size=(300,300),
 
                 inters = iw * ih
                 uni = ((d[2] - d[0]) * (d[3] - d[1]) +
-                       (targets[:,2] - targets[:,0]) * (targets[:,3] - targets[:,1]) - inters) + 10e-12
+                       (targets[:, 2] - targets[:, 0]) *
+                       (targets[:, 3] - targets[:, 1]) - inters) + 10e-12
 
                 overlaps = inters / uni
                 overlaps = np.max(overlaps)
 
                 if overlaps > overlap_threshold:
-                   detected = 1
+                    detected = 1
 
                 prediction = np.array([d[-1], detected, int(not detected)])
                 results = np.vstack((results, prediction))
@@ -115,27 +118,29 @@ def test_net(model, dataset, top_k, im_size=(300,300),
 
                 inters = iw * ih
                 uni = ((t[2] - t[0]) * (t[3] - t[1]) +
-                       (agg_detections[:,2] - agg_detections[:,0]) *
-                       (agg_detections[:,3] - agg_detections[:,1]) - inters) + 10e-12
+                       (agg_detections[:, 2] - agg_detections[:, 0]) *
+                       (agg_detections[:, 3] - agg_detections[:, 1]) -
+                       inters) + 10e-12
 
                 overlaps = inters / uni
                 overlaps_x = overlaps.argmax()
                 overlaps = np.max(overlaps)
 
                 if overlaps > overlap_threshold:
-                   detected = 1
+                    detected = 1
 
-                prediction = np.array([agg_detections[overlaps_x, -1], detected, int(not detected)])
+                prediction = np.array([agg_detections[overlaps_x, -1],
+                                       detected, int(not detected)])
                 results2 = np.vstack((results2, prediction))
 
-        results = results[(-results[:,0]).argsort()]
-        fp = np.cumsum(results[:,2])
-        tp = np.cumsum(results[:,1])
+        results = results[(-results[:, 0]).argsort()]
+        fp = np.cumsum(results[:, 2])
+        tp = np.cumsum(results[:, 1])
         prec = tp / (tp + fp)
 
-        results2 = results2[(-results2[:,0]).argsort()]
-        fn = np.cumsum(results2[:,2])
-        tp = np.cumsum(results2[:,1])
+        results2 = results2[(-results2[:, 0]).argsort()]
+        fn = np.cumsum(results2[:, 2])
+        tp = np.cumsum(results2[:, 1])
         rec = tp / (tp + fn)
         print(rec)
         print(prec)
@@ -153,7 +158,7 @@ if __name__ == '__main__':
     model_source_path = './models/ssd-jet-2.pth'
 
     num_classes = 1
-    num_classes = num_classes + 1 # +1 for background
+    num_classes = num_classes + 1  # +1 for background
 
     net = build_ssd('test', 300, num_classes, False)
     net.load_weights(model_source_path)
@@ -176,5 +181,6 @@ if __name__ == '__main__':
     img_size = (300, 300)
 
     for i in range(1, num_classes):
-        ap = test_net(net, train_loader, top_k, img_size, confidence_threshold, overlap_threshold)
+        ap = test_net(net, train_loader, top_k, img_size,
+                      confidence_threshold, overlap_threshold)
         print('Average precision for class %s: %s' % (i, ap))

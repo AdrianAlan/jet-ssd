@@ -19,10 +19,12 @@ from ssd.layers.modules import MultiBoxLoss
 from ssd.generator import CalorimeterJetDataset
 from ssd.net import build_ssd
 
+
 def adjust_learning_rate(optimizer, gamma, lr):
     lr = lr * gamma
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
+
 
 def detection_collate(batch):
     targets = []
@@ -32,10 +34,12 @@ def detection_collate(batch):
         targets.append(torch.FloatTensor(sample[1]))
     return torch.stack(imgs, 0), targets
 
+
 def weights_init(m):
     if isinstance(m, nn.Conv2d):
         xavier(m.weight.data)
         m.bias.data.zero_()
+
 
 def xavier(param):
     init.xavier_uniform_(param)
@@ -155,7 +159,8 @@ for epoch in range(1, train_epochs+1):
         av_train_loss = av_train_loss_l + av_train_loss_c
 
         tr.set_description(
-            'Epoch {} Loss {:.5f} Localization {:.5f} Classification {:.5f}'.format(
+            ('Epoch {} Loss {:.5f} ' +
+             'Localization {:.5f} Classification {:.5f}').format(
                 epoch, av_train_loss, av_train_loss_l, av_train_loss_c))
 
         tr.update(len(images))
@@ -176,13 +181,14 @@ for epoch in range(1, train_epochs+1):
             loss_l, loss_c = criterion(output, targets)
             val_loss_l = np.append(val_loss_l, loss_l.item())
             val_loss_c = np.append(val_loss_c, loss_c.item())
-   
+
             av_val_loss_l = np.average(val_loss_l)
             av_val_loss_c = np.average(val_loss_c)
             av_val_loss = av_val_loss_l + av_val_loss_c
 
             tr.set_description(
-                'Validation Loss {:.5f} Localization {:.5f} Classification {:.5f}'.format(
+                ('Validation Loss {:.5f} ' +
+                 'Localization {:.5f} Classification {:.5f}').format(
                     av_val_loss, av_val_loss_l, av_val_loss_c))
 
             tr.update(len(images))

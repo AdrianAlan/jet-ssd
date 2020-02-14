@@ -29,21 +29,20 @@ class SSD(nn.Module):
         super(SSD, self).__init__()
         self.phase = phase
         self.num_classes = num_classes
-        
+
         jet = {'num_classes': 5,
-                'lr_steps': (80000, 100000, 120000),
-                'max_iter': 120000,
-                'feature_maps': [38, 19, 10, 5, 3, 1],
-                'min_dim': 300,
-                'steps': [8, 16, 32, 64, 100, 300],
-                'min_sizes': [30, 60, 111, 162, 213, 264],
-                'max_sizes': [60, 111, 162, 213, 264, 315],
-                'aspect_ratios': [[2], [2, 3], [2, 3], [2, 3], [2], [2]],
-                'variance': [0.1, 0.2],
-                'clip': True,
-                'name': 'jet',
-                }
-        
+               'lr_steps': (80000, 100000, 120000),
+               'max_iter': 120000,
+               'feature_maps': [38, 19, 10, 5, 3, 1],
+               'min_dim': 300,
+               'steps': [8, 16, 32, 64, 100, 300],
+               'min_sizes': [30, 60, 111, 162, 213, 264],
+               'max_sizes': [60, 111, 162, 213, 264, 315],
+               'aspect_ratios': [[2], [2, 3], [2, 3], [2, 3], [2], [2]],
+               'variance': [0.1, 0.2],
+               'clip': True,
+               'name': 'jet'}
+
         self.cfg = jet
         self.priorbox = PriorBox(self.cfg)
         self.priors = Variable(self.priorbox.forward())
@@ -107,14 +106,14 @@ class SSD(nn.Module):
         for (x, l, c) in zip(sources, self.loc, self.conf):
             loc.append(l(x).permute(0, 2, 3, 1).contiguous())
             conf.append(c(x).permute(0, 2, 3, 1).contiguous())
-        
+
         loc = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
         conf = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
         if self.phase == "test":
             output = self.detect(
-                loc.view(loc.size(0), -1, 4),                   # loc preds
-                self.softmax(conf.view(conf.size(0), -1, self.num_classes)), # conf preds
-                self.priors.type(type(x.data))                  # default boxes
+                loc.view(loc.size(0), -1, 4),
+                self.softmax(conf.view(conf.size(0), -1, self.num_classes)),
+                self.priors.type(type(x.data))
             )
         else:
             output = (
@@ -183,15 +182,16 @@ def multibox(vgg, extra_layers, cfg, num_classes, conv):
     vgg_source = [21, -2]
     for k, v in enumerate(vgg_source):
         loc_layers += [conv(vgg[v].out_channels,
-                                 cfg[k] * 4, kernel_size=3, padding=1)]
+                       cfg[k] * 4, kernel_size=3, padding=1)]
         conf_layers += [conv(vgg[v].out_channels,
                         cfg[k] * num_classes, kernel_size=3, padding=1)]
     for k, v in enumerate(extra_layers[1::2], 2):
         loc_layers += [conv(v.out_channels, cfg[k]
-                                 * 4, kernel_size=3, padding=1)]
+                       * 4, kernel_size=3, padding=1)]
         conf_layers += [conv(v.out_channels, cfg[k]
-                                  * num_classes, kernel_size=3, padding=1)]
+                        * num_classes, kernel_size=3, padding=1)]
     return vgg, extra_layers, (loc_layers, conf_layers)
+
 
 base = {
     '300': [32, 32, 'M', 64, 64, 'M', 128, 128, 128, 'C', 256, 256, 256, 'M',
@@ -216,7 +216,7 @@ def build_ssd(phase, size=300, num_classes=21, binary=True):
         print("ERROR: You specified size " + repr(size) + ". However, " +
               "currently only SSD300 (size=300) is supported!")
         return
-    
+
     if binary:
         conv = BinaryConv2d
     else:
