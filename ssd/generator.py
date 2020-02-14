@@ -39,7 +39,6 @@ class CalorimeterJetDataset(torch.utils.data.Dataset):
         while redo:
             label_raw = np.asarray([self.labels[index]], dtype=np.float32)
             label_reshaped = label_raw.reshape(-1, 6)
-            mask = label_reshaped[:, 5] > 100
             label_reshaped = label_reshaped[:, :-1] # Remove PT
             label_reshaped = label_reshaped[:, [1,2,3,4,0]] # Class Last
             label_reshaped[:, 0] = label_reshaped[:, 0] / float(self.width) # x_min
@@ -47,7 +46,6 @@ class CalorimeterJetDataset(torch.utils.data.Dataset):
             label_reshaped[:, 1] = label_reshaped[:, 1] / float(self.height) # y_min
             label_reshaped[:, 3] = label_reshaped[:, 3] / float(self.height) # y_max
             label_reshaped[:, 4] = 0.#label_reshaped[:, 4] - 1. # label
-            label_reshaped = label_reshaped[mask]
             label_reshaped = np.asarray(label_reshaped, dtype=np.float32)
             label_reshaped = torch.from_numpy(label_reshaped)
 
