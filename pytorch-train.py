@@ -48,7 +48,7 @@ else:
 HOME = pathlib.Path().absolute()
 DATA_SOURCE = '/eos/user/a/adpol/ceva/fast'
 
-dataset = 'ssd-jet-3'
+dataset = 'ssd-jet-tests'
 train_dataset_path = '%s/RSGraviton_NARROW_0.h5' % DATA_SOURCE
 save_folder = os.path.join(HOME, 'models/')
 
@@ -116,7 +116,7 @@ for epoch in range(1, train_epochs+1):
     if epoch in lr_steps:
         adjust_learning_rate(optimizer, gamma, lr)
 
-    batch_loss = [0]
+    batch_loss_l, batch_loss_c = np.empty(0), np.empty(0)
 
     tr = trange(len(train_loader)*batch_size, file=sys.stdout)
     tr.set_description('Epoch {}'.format(epoch))
@@ -129,17 +129,25 @@ for epoch in range(1, train_epochs+1):
         optimizer.zero_grad()
         output = net(images)
         loss_l, loss_c = criterion(output, targets)
+        batch_loss_l = np.append(batch_loss_l, loss_l.item())
+        batch_loss_c = np.append(batch_loss_c, loss_c.item())
         loss = loss_l + loss_c
         loss.backward()
-        batch_loss.append(loss.item())
         optimizer.step()
+        
+        av_batch_loss_l = np.average(batch_loss_l)
+        av_batch_loss_c = np.average(batch_loss_c)
 
         if epoch < 10:
-            tr.set_description('Epoch {}  {:.6f}'.format(epoch,
-                    np.average(batch_loss)))
+            tr.set_description(
+                 'Epoch {} Loss {:.5f} Localization {:.5f} Classification {:.5f}'.format(
+                     epoch, av_batch_loss_l + av_batch_loss_c,
+                     av_batch_loss_l, av_batch_loss_c))
         else:
-            tr.set_description('Epoch {} {:.6f}'.format(epoch,
-                    np.average(batch_loss)))
+            tr.set_description(
+                 'Epoch {} Loss {:.5f} Localization {:.5f} Classification {:.5f}'.format(
+                     epoch, av_batch_loss_l + av_batch_loss_c,
+                     av_batch_loss_l, av_batch_loss_c))
 
         tr.update(len(images))
 
