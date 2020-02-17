@@ -19,6 +19,8 @@ from ssd.layers.modules import MultiBoxLoss
 from ssd.generator import CalorimeterJetDataset
 from ssd.net import build_ssd
 
+from utils import LossPlot
+
 
 def adjust_learning_rate(optimizer, lr):
     for param_group in optimizer.param_groups:
@@ -134,6 +136,11 @@ criterion = MultiBoxLoss(num_classes+1,
 checkpoint_es = EarlyStopping(patience=20,
                               save_path='%s%s.pth' % (save_folder, dataset))
 
+loss_plot = LossPlot(save_path='%s%s.png' % (save_folder, dataset))
+
+train_loss, train_loss_l, train_loss_c = np.empty(0), np.empty(0), np.empty(0)
+val_loss, val_loss_l, val_loss_c = np.empty(0), np.empty(0), np.empty(0)
+
 for epoch in range(1, train_epochs+1):
 
     if epoch in lr_steps:
@@ -142,7 +149,7 @@ for epoch in range(1, train_epochs+1):
 
     tr = trange(len(train_loader)*batch_size, file=sys.stdout)
     tr.set_description('Epoch {}'.format(epoch))
-    train_loss_l, train_loss_c = np.empty(0), np.empty(0)
+    batch_loss_l, batch_loss_c = np.empty(0), np.empty(0)
     net.train()
 
     for batch_index, (images, targets) in enumerate(train_loader):
@@ -153,8 +160,8 @@ for epoch in range(1, train_epochs+1):
         optimizer.zero_grad()
         output = net(images)
         loss_l, loss_c = criterion(output, targets)
-        train_loss_l = np.append(train_loss_l, loss_l.item())
-        train_loss_c = np.append(train_loss_c, loss_c.item())
+        batch_loss_l = np.append(batch_loss_l, loss_l.item())
+        batch_loss_c = np.append(batch_loss_c, loss_c.item())
         loss = loss_l + loss_c
         loss.backward()
 
@@ -170,8 +177,8 @@ for epoch in range(1, train_epochs+1):
                 if hasattr(p, 'org'):
                     p.org.copy_(p.data.clamp_(-1, 1))
 
-        av_train_loss_l = np.average(train_loss_l)
-        av_train_loss_c = np.average(train_loss_c)
+        av_train_loss_l = np.average(batch_loss_l)
+        av_train_loss_c = np.average(batch_loss_c)
         av_train_loss = av_train_loss_l + av_train_loss_c
 
         tr.set_description(
@@ -181,6 +188,10 @@ for epoch in range(1, train_epochs+1):
 
         tr.update(len(images))
 
+    train_loss_l = np.append(train_loss_l, av_train_loss_l)
+    train_loss_c = np.append(train_loss_c, av_train_loss_c)
+    train_loss = np.append(train_loss, av_train_loss)
+
     tr.close()
 
     # Validation works only on full precision network
@@ -188,7 +199,7 @@ for epoch in range(1, train_epochs+1):
 
         tr = trange(len(val_loader)*batch_size, file=sys.stdout)
         tr.set_description('Validation')
-        val_loss_l, val_loss_c = np.empty(0), np.empty(0)
+        batch_loss_l, batch_loss_c = np.empty(0), np.empty(0)
         net.eval()
 
         with torch.no_grad():
@@ -199,11 +210,11 @@ for epoch in range(1, train_epochs+1):
 
                 output = ssd_net(images)
                 loss_l, loss_c = criterion(output, targets)
-                val_loss_l = np.append(val_loss_l, loss_l.item())
-                val_loss_c = np.append(val_loss_c, loss_c.item())
+                batch_loss_l = np.append(batch_loss_l, loss_l.item())
+                batch_loss_c = np.append(batch_loss_c, loss_c.item())
 
-                av_val_loss_l = np.average(val_loss_l)
-                av_val_loss_c = np.average(val_loss_c)
+                av_val_loss_l = np.average(batch_loss_l)
+                av_val_loss_c = np.average(batch_loss_c)
                 av_val_loss = av_val_loss_l + av_val_loss_c
 
                 tr.set_description(
@@ -215,12 +226,19 @@ for epoch in range(1, train_epochs+1):
 
         tr.close()
 
+        val_loss_l = np.append(val_loss_l, av_val_loss_l)
+        val_loss_c = np.append(val_loss_c, av_val_loss_c)
+        val_loss = np.append(val_loss, av_val_loss)
+
+        loss_plot.draw([train_loss, train_loss_l, train_loss_c],
+                       [val_loss, val_loss_l, val_loss_c],
+                       ['Full', 'Localization', 'Classification'])
+
         if checkpoint_es(av_val_loss, ssd_net):
             break
     else:
         if checkpoint_es(av_train_loss, ssd_net):
             break
-
 
 h5_train.close()
 h5_val.close()
