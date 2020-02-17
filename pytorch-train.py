@@ -128,12 +128,12 @@ criterion = MultiBoxLoss(num_classes+1,
 checkpoint_es = EarlyStopping(patience=20,
                               save_path='%s%s.pth' % (save_folder, dataset))
 
-net.train()
-
 for epoch in range(1, train_epochs+1):
 
     if epoch in lr_steps:
         adjust_learning_rate(optimizer, gamma, lr)
+
+    net.train()
 
     train_loss_l, train_loss_c = np.empty(0), np.empty(0)
 
@@ -168,6 +168,8 @@ for epoch in range(1, train_epochs+1):
     tr.close()
 
     # Calculate validation loss
+    net.eval()
+
     val_loss_l, val_loss_c = np.empty(0), np.empty(0)
 
     tr = trange(len(val_loader)*batch_size, file=sys.stdout)
