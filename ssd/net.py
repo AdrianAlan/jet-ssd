@@ -84,15 +84,16 @@ class SSD(nn.Module):
         loc = list()
         conf = list()
 
+        # For batch norm == 33
         # apply vgg up to conv4_3 relu
-        for k in range(23):
+        for k in range(33):
             x = self.vgg[k](x)
 
         s = self.L2Norm(x)
         sources.append(s)
 
         # apply vgg up to fc7
-        for k in range(23, len(self.vgg)):
+        for k in range(33, len(self.vgg)):
             x = self.vgg[k](x)
         sources.append(x)
 
@@ -136,7 +137,7 @@ class SSD(nn.Module):
 
 # This function is derived from torchvision VGG make_layers()
 # https://github.com/pytorch/vision/blob/master/torchvision/models/vgg.py
-def vgg(cfg, i, conv, batch_norm=False):
+def vgg(cfg, i, conv, acti, batch_norm=True):
     layers = []
     in_channels = i
     for v in cfg:
@@ -147,19 +148,18 @@ def vgg(cfg, i, conv, batch_norm=False):
         else:
             conv2d = conv(in_channels, v, kernel_size=3, padding=1)
             if batch_norm:
-                layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
+                layers += [conv2d, nn.BatchNorm2d(v), acti]
             else:
-                layers += [conv2d, nn.ReLU(inplace=True)]
+                layers += [conv2d, acti]
             in_channels = v
     pool5 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
     conv6 = conv(256, 512, kernel_size=3, padding=6, dilation=6)
     conv7 = conv(512, 512, kernel_size=1)
-    layers += [pool5, conv6,
-               nn.ReLU(inplace=True), conv7, nn.ReLU(inplace=True)]
+    layers += [pool5, conv6, acti, conv7, acti]
     return layers
 
 
-def add_extras(cfg, i, conv, batch_norm=False):
+def add_extras(cfg, i, conv, batch_norm=True):
     # Extra layers added to VGG for feature scaling
     layers = []
     in_channels = i
@@ -176,15 +176,19 @@ def add_extras(cfg, i, conv, batch_norm=False):
     return layers
 
 
-def multibox(vgg, extra_layers, cfg, num_classes, conv):
+def multibox(vgg, extra_layers, cfg, num_classes, conv, acti, batch_norm=True):
     loc_layers = []
     conf_layers = []
-    vgg_source = [21, -2]
+    if batch_norm:
+        vgg_source = [27, -2]
+    else:
+        vgg_source = [21, -2]
     for k, v in enumerate(vgg_source):
         loc_layers += [conv(vgg[v].out_channels,
                        cfg[k] * 4, kernel_size=3, padding=1)]
         conf_layers += [conv(vgg[v].out_channels,
                         cfg[k] * num_classes, kernel_size=3, padding=1)]
+
     for k, v in enumerate(extra_layers[1::2], 2):
         loc_layers += [conv(v.out_channels, cfg[k]
                        * 4, kernel_size=3, padding=1)]
@@ -219,10 +223,15 @@ def build_ssd(phase, size=300, num_classes=21, binary=True):
 
     if binary:
         conv = BinaryConv2d
+        acti = nn.Hardtanh(inplace=True)
     else:
         conv = nn.Conv2d
+        acti = nn.ReLU(inplace=True)
 
-    base_, extras_, head_ = multibox(vgg(base[str(size)], 2, conv),
-                                     add_extras(extras[str(size)], 512, conv),
-                                     mbox[str(size)], num_classes, conv)
+    base_, extras_, head_ = multibox(vgg(base[str(size)], 2, conv, acti),
+                                     add_extras(extras[str(size)],
+                                                512,
+                                                conv,
+                                                acti),
+                                     mbox[str(size)], num_classes, conv, acti)
     return SSD(phase, size, base_, extras_, head_, num_classes)

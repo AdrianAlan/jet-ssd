@@ -20,8 +20,7 @@ from ssd.generator import CalorimeterJetDataset
 from ssd.net import build_ssd
 
 
-def adjust_learning_rate(optimizer, gamma, lr):
-    lr = lr * gamma
+def adjust_learning_rate(optimizer, lr):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
@@ -53,6 +52,7 @@ else:
 
 HOME = pathlib.Path().absolute()
 DATA_SOURCE = '/eos/user/a/adpol/ceva/fast'
+BINARY = False
 
 dataset = 'ssd-jet-tests'
 train_dataset_path = '%s/RSGraviton_NARROW_0.h5' % DATA_SOURCE
@@ -60,15 +60,23 @@ val_dataset_path = '%s/RSGraviton_NARROW_1.h5' % DATA_SOURCE
 save_folder = os.path.join(HOME, 'models/')
 
 # Learning Parameters
-num_classes = 1
-batch_size = 100
-train_epochs = 50
 num_workers = 1
-lr = 1e-4
-momentum = 0.9
-gamma = 0.1
-weight_decay = 5e-4
-lr_steps = (30, 40, 50)
+num_classes = 1
+batch_size = 50
+train_epochs = 250
+
+if BINARY:
+    lr = 1e-2
+    lrs = [5e-3, 1e-3, 5e-4, 1e-4]
+    momentum = 0.9
+    lr_steps = [10, 15, 20, 25]
+    weight_decay = 5e-4
+else:
+    lr = 1e-3
+    momentum = 0.9
+    weight_decay = 5e-4
+    lrs = [5e-4, 1e-4, 5e-5, 1e-5]
+    lr_steps = [20, 40, 60, 80]
 
 # Create a save directory
 if not os.path.join(HOME, save_folder):
@@ -88,13 +96,11 @@ val_dataset = CalorimeterJetDataset(hdf5_dataset=h5_val)
 val_loader = torch.utils.data.DataLoader(val_dataset,
                                          batch_size=batch_size,
                                          collate_fn=detection_collate,
-                                         shuffle=True,
+                                         shuffle=False,
                                          num_workers=num_workers)
 
-
 # Build SSD Network
-ssd_net = build_ssd('train', 300, num_classes + 1, False)
-net = ssd_net
+ssd_net = build_ssd('train', 300, num_classes + 1, BINARY)
 
 # Data Parallelization
 net = torch.nn.DataParallel(ssd_net)
@@ -131,14 +137,13 @@ checkpoint_es = EarlyStopping(patience=20,
 for epoch in range(1, train_epochs+1):
 
     if epoch in lr_steps:
-        adjust_learning_rate(optimizer, gamma, lr)
-
-    net.train()
-
-    train_loss_l, train_loss_c = np.empty(0), np.empty(0)
+        new_lr = lrs[lr_steps.index(epoch)]
+        adjust_learning_rate(optimizer, new_lr)
 
     tr = trange(len(train_loader)*batch_size, file=sys.stdout)
     tr.set_description('Epoch {}'.format(epoch))
+    train_loss_l, train_loss_c = np.empty(0), np.empty(0)
+    net.train()
 
     for batch_index, (images, targets) in enumerate(train_loader):
 
@@ -152,7 +157,18 @@ for epoch in range(1, train_epochs+1):
         train_loss_c = np.append(train_loss_c, loss_c.item())
         loss = loss_l + loss_c
         loss.backward()
+
+        if BINARY:
+            for p in list(net.parameters()):
+                if hasattr(p, 'org'):
+                    p.data.copy_(p.org)
+
         optimizer.step()
+
+        if BINARY:
+            for p in list(net.parameters()):
+                if hasattr(p, 'org'):
+                    p.org.copy_(p.data.clamp_(-1, 1))
 
         av_train_loss_l = np.average(train_loss_l)
         av_train_loss_c = np.average(train_loss_c)
@@ -167,37 +183,44 @@ for epoch in range(1, train_epochs+1):
 
     tr.close()
 
-    # Calculate validation loss
-    net.eval()
+    # Validation works only on full precision network
+    if not BINARY:
 
-    val_loss_l, val_loss_c = np.empty(0), np.empty(0)
+        tr = trange(len(val_loader)*batch_size, file=sys.stdout)
+        tr.set_description('Validation')
+        val_loss_l, val_loss_c = np.empty(0), np.empty(0)
+        net.eval()
 
-    tr = trange(len(val_loader)*batch_size, file=sys.stdout)
-    tr.set_description('Validation')
+        with torch.no_grad():
+            for batch_index, (images, targets) in enumerate(val_loader):
 
-    with torch.no_grad():
-        for batch_index, (images, targets) in enumerate(val_loader):
-            images = Variable(images.cuda())
-            targets = [Variable(ann.cuda()) for ann in targets]
-            output = net(images)
-            loss_l, loss_c = criterion(output, targets)
-            val_loss_l = np.append(val_loss_l, loss_l.item())
-            val_loss_c = np.append(val_loss_c, loss_c.item())
+                images = Variable(images.cuda())
+                targets = [Variable(ann.cuda()) for ann in targets]
 
-            av_val_loss_l = np.average(val_loss_l)
-            av_val_loss_c = np.average(val_loss_c)
-            av_val_loss = av_val_loss_l + av_val_loss_c
+                output = ssd_net(images)
+                loss_l, loss_c = criterion(output, targets)
+                val_loss_l = np.append(val_loss_l, loss_l.item())
+                val_loss_c = np.append(val_loss_c, loss_c.item())
 
-            tr.set_description(
-                ('Validation Loss {:.5f} ' +
-                 'Localization {:.5f} Classification {:.5f}').format(
-                    av_val_loss, av_val_loss_l, av_val_loss_c))
+                av_val_loss_l = np.average(val_loss_l)
+                av_val_loss_c = np.average(val_loss_c)
+                av_val_loss = av_val_loss_l + av_val_loss_c
 
-            tr.update(len(images))
+                tr.set_description(
+                    ('Validation Loss {:.5f} ' +
+                     'Localization {:.5f} Classification {:.5f}').format(
+                       av_val_loss, av_val_loss_l, av_val_loss_c))
 
-    tr.close()
+                tr.update(len(images))
 
-    if checkpoint_es(av_val_loss, ssd_net):
-        break
+        tr.close()
+
+        if checkpoint_es(av_val_loss, ssd_net):
+            break
+    else:
+        if checkpoint_es(av_train_loss, ssd_net):
+            break
+
 
 h5_train.close()
+h5_val.close()
