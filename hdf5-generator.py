@@ -92,6 +92,7 @@ class HDF5Generator:
                                                             tower='Tower.Ehad')
         self.edges_phi_hcal = self.constants.get_edges_ecal(edge_index=2,
                                                             tower='Tower.Ehad')
+
         self.unique_label = self.constants.get_class(jtype)
         self.hdf5_dataset_path = hdf5_dataset_path
         self.hdf5_dataset_size = hdf5_dataset_size
@@ -102,26 +103,47 @@ class HDF5Generator:
         # Create the HDF5 file.
         hdf5_dataset = h5py.File(self.hdf5_dataset_path, 'w')
 
-        # Create dataset where the images will be stored as flattened arrays
-        hdf5_calorimeter = hdf5_dataset.create_dataset(
-                name='calorimeter',
-                shape=(self.hdf5_dataset_size,),
-                maxshape=(None),
-                dtype=h5py.special_dtype(vlen=np.uint16))
-
-        # Create dataset where the labels are stored as flattened arrays
         hdf5_labels = hdf5_dataset.create_dataset(
                 name='labels',
                 shape=(self.hdf5_dataset_size,),
                 maxshape=(None),
                 dtype=h5py.special_dtype(vlen=np.uint16))
 
-        # Create dataset that will hold the dimensions of labels arrays
-        hdf5_label_shapes = hdf5_dataset.create_dataset(
-                name='label_shapes',
-                shape=(self.hdf5_dataset_size, 2),
-                maxshape=(None, 2),
-                dtype=np.uint8)
+        hdf5_ecal_energy = hdf5_dataset.create_dataset(
+                name='ecal_energy',
+                shape=(self.hdf5_dataset_size,),
+                maxshape=(None),
+                dtype=h5py.special_dtype(vlen=np.uint16))
+
+        hdf5_ecal_phi = hdf5_dataset.create_dataset(
+                name='ecal_phi',
+                shape=(self.hdf5_dataset_size,),
+                maxshape=(None),
+                dtype=h5py.special_dtype(vlen=np.uint16))
+
+        hdf5_ecal_eta = hdf5_dataset.create_dataset(
+                name='ecal_eta',
+                shape=(self.hdf5_dataset_size,),
+                maxshape=(None),
+                dtype=h5py.special_dtype(vlen=np.uint16))
+
+        hdf5_hcal_energy = hdf5_dataset.create_dataset(
+                name='hcal_energy',
+                shape=(self.hdf5_dataset_size,),
+                maxshape=(None),
+                dtype=h5py.special_dtype(vlen=np.uint16))
+
+        hdf5_hcal_phi = hdf5_dataset.create_dataset(
+                name='hcal_phi',
+                shape=(self.hdf5_dataset_size,),
+                maxshape=(None),
+                dtype=h5py.special_dtype(vlen=np.uint16))
+
+        hdf5_hcal_eta = hdf5_dataset.create_dataset(
+                name='hcal_eta',
+                shape=(self.hdf5_dataset_size,),
+                maxshape=(None),
+                dtype=h5py.special_dtype(vlen=np.uint16))
 
         i = 0
 
@@ -170,12 +192,9 @@ class HDF5Generator:
 
                 etas = etas[etas_mask]
                 phis = phis[etas_mask]
-                energy = energy[etas_mask]
-
-                pixels_ecal = self.get_energy_map(etas,
-                                                  phis,
-                                                  energy,
-                                                  cal='ecal')
+                ecal_phis, ecal_etas = self.get_energy_map(etas, phis,
+                                                           cal='ECAL')
+                ecal_energy = energy[etas_mask]
 
                 # Get HCAL info
                 hcal_mask = hcal_energy_full_file[event_number] > 0
@@ -189,24 +208,21 @@ class HDF5Generator:
 
                 etas = etas[etas_mask]
                 phis = phis[etas_mask]
-                energy = energy[etas_mask]
-
-                pixels_hcal = self.get_energy_map(etas,
-                                                  phis,
-                                                  energy,
-                                                  cal='hcal')
+                hcal_phis, hcal_etas = self.get_energy_map(etas, phis,
+                                                           cal='HCAL')
+                hcal_energy = energy[etas_mask]
 
                 # Push the data to hdf5
-                # Flatten the image array and write it to the images dataset.
-                calorimeter = np.append(pixels_ecal, pixels_hcal)
+                hdf5_ecal_energy[i] = ecal_energy
+                hdf5_ecal_phi[i] = ecal_phis
+                hdf5_ecal_eta[i] = ecal_etas
 
-                hdf5_calorimeter[i] = calorimeter
+                hdf5_hcal_energy[i] = hcal_energy
+                hdf5_hcal_phi[i] = hcal_phis
+                hdf5_hcal_eta[i] = hcal_etas
 
                 # Flatten the labels array and write it to the labels dataset.
                 hdf5_labels[i] = labels.reshape(-1)
-
-                # Write the labels' shape to the label shapes dataset.
-                hdf5_label_shapes[i] = labels.shape
 
                 i = i + 1
 
@@ -240,43 +256,19 @@ class HDF5Generator:
 
         return np.asarray(labels)
 
-    def get_energy_map(self, etas, phis, energy, cal='ecal'):
+    def get_energy_map(self, etas, phis, cal='ECAL'):
 
-        coordinates = []
+        if cal == 'ECAL':
+            edges_phi = self.edges_phi_ecal
+            edges_eta = self.edges_eta_ecal
+        if cal == 'HCAL':
+            edges_phi = self.edges_phi_hcal
+            edges_eta = self.edges_eta_hcal
 
-        for eta, phi in zip(etas, phis):
+        indices_phi = np.squeeze([np.where(edges_phi == i) for i in phis])
+        indices_eta = np.squeeze([np.where(edges_eta == i) for i in etas])
 
-            if cal == 'ecal':
-                index_phi = np.where(self.edges_phi_ecal == phi)[0][0]
-                index_eta = np.where(self.edges_eta_ecal == eta)[0][0]
-            else:
-                index_phi = np.where(self.edges_phi_hcal == phi)[0][0]
-                index_eta = np.where(self.edges_eta_hcal == eta)[0][0]
-
-            coordinates.append((index_phi, index_eta))
-
-        if cal == 'ecal':
-            pixels = np.zeros((len(self.edges_phi_ecal)-1,
-                               len(self.edges_eta_ecal)-1))
-        else:
-            pixels = np.zeros((len(self.edges_phi_hcal)-1,
-                               len(self.edges_eta_hcal)-1))
-
-        for c, e in zip(coordinates, energy):
-            pixels[c[0]][c[1]] = e
-
-        if cal != 'ecal':
-            pixels = np.hstack((pixels[:, :85],
-                                pixels[:, 85:-85].repeat(5, axis=1),
-                                pixels[:, -85:]))
-
-        # Extend image top and bottom by a radius of the biggest jet
-        # Prevents cropped boxes in y plane
-        pixels = np.vstack((pixels[-self.constants.offset_phi:, :],
-                            pixels,
-                            pixels[:self.constants.offset_phi, :]))
-
-        return pixels
+        return indices_phi, indices_eta
 
 
 class Utils():
@@ -407,9 +399,6 @@ if __name__ == '__main__':
                         desc=('Creating HDF5 Dataset for %s jets' % jet_type))
 
     for index, file_dict in enumerate(files_details):
-
-        if index > 1:
-            continue
 
         dataset_size = int((index+1)*batch_size)-int((index)*batch_size)
 
