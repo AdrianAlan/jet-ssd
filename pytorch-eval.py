@@ -1,8 +1,5 @@
 from __future__ import print_function
 
-from ssd.generator import CalorimeterJetDataset
-from ssd.net import build_ssd
-from sklearn.metrics import average_precision_score
 import h5py
 import numpy as np
 import torch
@@ -10,6 +7,10 @@ import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 import sys
+
+from sklearn.metrics import average_precision_score
+from ssd.generator import CalorimeterJetDataset
+from ssd.net import build_ssd
 
 
 def test_net(model, dataset, top_k, im_size=(300, 300),
