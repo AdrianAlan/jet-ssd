@@ -71,3 +71,5 @@ class LossPlot():
             plt.yscale("log")
 
         fig.savefig(self.save_path, bbox_inches="tight")
+
+        plt.close(fig)
