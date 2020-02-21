@@ -110,8 +110,9 @@ def test_net(model, dataset, top_k, im_size=(300, 300),
 
         progress_bar.close()
 
-        return (average_precision_score(results[:, 0], results[:, 1]),
-                1000*np.mean(inf_time))
+        return (round(average_precision_score(results[:, 0],
+                                              results[:, 1]), 2),
+                round(1000*np.mean(inf_time)))
 
 
 if __name__ == '__main__':
