@@ -110,9 +110,8 @@ def test_net(model, dataset, top_k, im_size=(300, 300),
 
         progress_bar.close()
 
-        return (round(average_precision_score(results[:, 0],
-                                              results[:, 1]), 2),
-                round(1000*np.mean(inf_time)))
+        return average_precision_score(
+                    results[:, 0], results[:, 1]), 1000*np.mean(inf_time)
 
 
 if __name__ == '__main__':
@@ -132,7 +131,6 @@ if __name__ == '__main__':
     net.eval()
     net = net.cuda()
     cudnn.benchmark = True
-    print('Finished loading model')
 
     train_dataset_path = '/eos/user/a/adpol/ceva/fast/RSGraviton_NARROW_0.h5'
     h5_train = h5py.File(train_dataset_path, 'r')
@@ -143,7 +141,7 @@ if __name__ == '__main__':
                                                num_workers=1)
 
     for i in range(1, num_classes):
-        (ap, it) = test_net(net, train_loader, top_k=10, im_size=(300, 300),
-                            conf_threshold=0.01, overlap_threshold=0.5)
-        print('Average precision for class %s: %s' % (i, ap))
-        print('Average inference time for class %s: %s ms' % (i, it))
+        ap, it = test_net(net, train_loader, top_k=10, im_size=(300, 300),
+                          conf_threshold=0.01, overlap_threshold=0.5)
+        print('Average precision for class {0}: {1:.2f}'.format(i, ap))
+        print('Average inference time for class {0}: {1:.2f} ms'.format(i, it))
