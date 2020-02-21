@@ -11,6 +11,7 @@ import sys
 from sklearn.metrics import average_precision_score
 from ssd.generator import CalorimeterJetDataset
 from ssd.net import build_ssd
+from tqdm import tqdm
 
 
 def test_net(model, dataset, top_k, im_size=(300, 300),
@@ -19,6 +20,9 @@ def test_net(model, dataset, top_k, im_size=(300, 300),
     results = np.empty((0, 2))
 
     with torch.no_grad():
+
+        progress_bar = tqdm(total=len(dataset), desc='Evaluating events')
+
         for data, targets in dataset:
             data = data.cuda()
             detections = model(data).data
@@ -93,6 +97,10 @@ def test_net(model, dataset, top_k, im_size=(300, 300),
                     all_detections = np.vstack((all_detections, fn))
 
                 results = np.vstack((results, all_detections[:, [6, 5]]))
+
+            progress_bar.update(1)
+
+        progress_bar.close()
 
         return average_precision_score(results[:, 0], results[:, 1])
 
