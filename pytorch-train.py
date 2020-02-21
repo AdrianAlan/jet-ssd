@@ -18,8 +18,7 @@ from ssd.checkpoints import EarlyStopping
 from ssd.layers.modules import MultiBoxLoss
 from ssd.generator import CalorimeterJetDataset
 from ssd.net import build_ssd
-
-from utils import LossPlot
+from utils import Plotting
 
 
 def adjust_learning_rate(optimizer, lr):
@@ -136,7 +135,7 @@ criterion = MultiBoxLoss(num_classes+1,
 checkpoint_es = EarlyStopping(patience=20,
                               save_path='%s%s.pth' % (save_folder, dataset))
 
-loss_plot = LossPlot(save_path='%s%s.png' % (save_folder, dataset))
+plot = Plotting(save_path='%s%s.png' % (save_folder, dataset))
 
 train_loss, train_loss_l, train_loss_c = np.empty(0), np.empty(0), np.empty(0)
 val_loss, val_loss_l, val_loss_c = np.empty(0), np.empty(0), np.empty(0)
@@ -230,7 +229,7 @@ for epoch in range(1, train_epochs+1):
         val_loss_c = np.append(val_loss_c, av_val_loss_c)
         val_loss = np.append(val_loss, av_val_loss)
 
-        loss_plot.draw([train_loss, train_loss_l, train_loss_c],
+        plot.draw_loss([train_loss, train_loss_l, train_loss_c],
                        [val_loss, val_loss_l, val_loss_c],
                        ['Full', 'Localization', 'Classification'])
 

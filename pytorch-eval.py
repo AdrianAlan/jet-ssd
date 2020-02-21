@@ -8,15 +8,19 @@ import torch.backends.cudnn as cudnn
 import torch.utils.data as data
 import sys
 
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import average_precision_score, precision_recall_curve
 from ssd.generator import CalorimeterJetDataset
 from ssd.net import build_ssd
 from time import time
 from tqdm import tqdm
+from utils import Plotting
 
 
 def test_net(model, dataset, top_k, im_size=(300, 300),
-             conf_threshold=0.05, overlap_threshold=0.1):
+             conf_threshold=0.05, overlap_threshold=0.1, plot_name=None):
+
+    if plot_name:
+        plot = Plotting(save_path=plot_name)
 
     results = np.empty((0, 2))
     inf_time = []
@@ -110,8 +114,14 @@ def test_net(model, dataset, top_k, im_size=(300, 300),
 
         progress_bar.close()
 
-        return average_precision_score(
-                    results[:, 0], results[:, 1]), 1000*np.mean(inf_time)
+        ap = average_precision_score(results[:, 0], results[:, 1])
+        it = 1000*np.mean(inf_time)
+
+        if plot_name:
+            p, r, _ = precision_recall_curve(results[:, 0], results[:, 1])
+            plot.draw_precision_recall(p, r, ap)
+
+        return ap, it
 
 
 if __name__ == '__main__':
@@ -122,6 +132,7 @@ if __name__ == '__main__':
         torch.set_default_tensor_type('torch.FloatTensor')
 
     model_source_path = './models/ssd-jet-tests.pth'
+    plot_name = './models/precision-recall.png'
 
     num_classes = 1
     num_classes = num_classes + 1  # +1 for background
@@ -142,6 +153,7 @@ if __name__ == '__main__':
 
     for i in range(1, num_classes):
         ap, it = test_net(net, train_loader, top_k=10, im_size=(300, 300),
-                          conf_threshold=0.01, overlap_threshold=0.5)
+                          conf_threshold=0.01, overlap_threshold=0.5,
+                          plot_name=plot_name)
         print('Average precision for class {0}: {1:.2f}'.format(i, ap))
         print('Average inference time for class {0}: {1:.2f} ms'.format(i, it))

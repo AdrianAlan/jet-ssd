@@ -1,9 +1,10 @@
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import simplejson as json
 
 
-class LossPlot():
+class Plotting():
 
     def __init__(self, save_path):
 
@@ -47,7 +48,7 @@ class LossPlot():
 
         self.line_styles = [(0, ()), (0, (3, 2))]
 
-    def draw(self, data_train, data_val, keys):
+    def draw_loss(self, data_train, data_val, keys):
         """Plots the training and validation loss"""
         fig, ax = plt.subplots()
 
@@ -69,6 +70,29 @@ class LossPlot():
             plt.legend(loc="upper right",
                        frameon=False)
             plt.yscale("log")
+
+        fig.savefig(self.save_path, bbox_inches="tight")
+
+        plt.close(fig)
+
+    def draw_precision_recall(self, precision, recall, ap):
+
+        fig, ax = plt.subplots()
+
+        plt.xlabel("Recall", horizontalalignment='right', x=1.0)
+        plt.ylabel("Precision", horizontalalignment='right', y=1.0)
+
+        color = self.colors[0]
+        precision = np.append(0, precision)
+        recall = np.append(1, recall)
+
+        plt.plot(recall, precision,
+                 linestyle=self.line_styles[0],
+                 color=color['shade_800'],
+                 label='AP {0: .2f}'.format(ap))
+
+        plt.legend(loc="upper right",
+                   frameon=False)
 
         fig.savefig(self.save_path, bbox_inches="tight")
 
