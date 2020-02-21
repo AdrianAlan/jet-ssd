@@ -11,6 +11,7 @@ import sys
 from sklearn.metrics import average_precision_score
 from ssd.generator import CalorimeterJetDataset
 from ssd.net import build_ssd
+from time import time
 from tqdm import tqdm
 
 
@@ -18,6 +19,7 @@ def test_net(model, dataset, top_k, im_size=(300, 300),
              conf_threshold=0.05, overlap_threshold=0.1):
 
     results = np.empty((0, 2))
+    inf_time = []
 
     with torch.no_grad():
 
@@ -25,7 +27,13 @@ def test_net(model, dataset, top_k, im_size=(300, 300),
 
         for data, targets in dataset:
             data = data.cuda()
+
+            t_start = time()
+
             detections = model(data).data
+
+            t_end = time()
+            inf_time.append(t_end-t_start)
 
             targets = targets[0].cpu().numpy()
             targets[:, 0] *= im_size[0]
@@ -102,7 +110,8 @@ def test_net(model, dataset, top_k, im_size=(300, 300),
 
         progress_bar.close()
 
-        return average_precision_score(results[:, 0], results[:, 1])
+        return (average_precision_score(results[:, 0], results[:, 1]),
+                1000*np.mean(inf_time))
 
 
 if __name__ == '__main__':
@@ -133,6 +142,7 @@ if __name__ == '__main__':
                                                num_workers=1)
 
     for i in range(1, num_classes):
-        ap = test_net(net, train_loader, top_k=10, im_size=(300, 300),
-                      conf_threshold=0.01, overlap_threshold=0.5)
+        (ap, it) = test_net(net, train_loader, top_k=10, im_size=(300, 300),
+                            conf_threshold=0.01, overlap_threshold=0.5)
         print('Average precision for class %s: %s' % (i, ap))
+        print('Average inference time for class %s: %s ms' % (i, it))
