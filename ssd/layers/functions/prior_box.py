@@ -20,7 +20,6 @@ class PriorBox(Function):
         steps = config['steps']
         min_sizes = config['min_sizes']
         max_sizes = config['max_sizes']
-        aspect_ratios = config['aspect_ratios']
         clip = config['clip']
 
         for k, f in enumerate(feature_maps):
@@ -40,10 +39,6 @@ class PriorBox(Function):
                 s_k_prime = sqrt(s_k * (max_sizes[k]/image_size))
                 mean += [cx, cy, s_k_prime, s_k_prime]
 
-                # rest of aspect ratios
-                for ar in aspect_ratios[k]:
-                    mean += [cx, cy, s_k*sqrt(ar), s_k/sqrt(ar)]
-                    mean += [cx, cy, s_k/sqrt(ar), s_k*sqrt(ar)]
         # back to torch land
         output = torch.Tensor(mean).view(-1, 4)
         if clip:
