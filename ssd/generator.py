@@ -13,7 +13,7 @@ class CalorimeterJetDataset(torch.utils.data.Dataset):
         self.l_format = l_format
 
         self.offset_phi = 46
-        self.height = 360 + 2 * self.offset_phi  # Height of the input images
+        self.height = 360  # Height of the input images
         self.width = 340  # Width of the input images
         self.channels = 2  # Number of color channels of the input images
         # This dictionary is for internal use
@@ -44,7 +44,9 @@ class CalorimeterJetDataset(torch.utils.data.Dataset):
         # Set fractional coordinates
         label_reshaped[:, 0] = label_reshaped[:, 0] / float(self.width)
         label_reshaped[:, 2] = label_reshaped[:, 2] / float(self.width)
+        label_reshaped[:, 1] = label_reshaped[:, 1] - self.offset_phi
         label_reshaped[:, 1] = label_reshaped[:, 1] / float(self.height)
+        label_reshaped[:, 3] = label_reshaped[:, 3] - self.offset_phi
         label_reshaped[:, 3] = label_reshaped[:, 3] / float(self.height)
         label_reshaped[:, 4] = 0.  # label_reshaped[:, 4] - 1. # label
 
@@ -64,13 +66,6 @@ class CalorimeterJetDataset(torch.utils.data.Dataset):
             pixels = np.hstack((pixels[:, :85],
                                 pixels[:, 85:-85].repeat(5, axis=1),
                                 pixels[:, -85:]))
-
-        # Extend image top and bottom by a radius of the biggest jet
-        # Prevents cropped boxes in y plane
-        pixels = np.vstack((pixels[-self.offset_phi:, :],
-                            pixels,
-                            pixels[:self.offset_phi, :]))
-
         return pixels
 
     def __getitem__(self, index):

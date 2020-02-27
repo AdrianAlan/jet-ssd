@@ -39,7 +39,7 @@ class SSD(nn.Module):
                'min_sizes': [34, 34, 34, 34, 34, 34],
                'max_sizes': [92, 92, 92, 92, 92, 92],
                'variance': [0.1, 0.2],
-               'clip': True,
+               'clip': False,
                'name': 'jet'}
 
         self.cfg = jet
