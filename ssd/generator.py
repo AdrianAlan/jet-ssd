@@ -104,10 +104,10 @@ class CalorimeterJetDataset(torch.utils.data.Dataset):
                                               cal='HCAL')
 
             # calorimeter = np.rollaxis(calorimeter, 0, 3) # channels last
-            calo = np.zeros((2, 300, 300))
-            calo[0] = cv2.resize(ecal_pixels, dsize=(300, 300),
+            calo = np.zeros((2, 340, 340))
+            calo[0] = cv2.resize(ecal_pixels, dsize=(340, 340),
                                  interpolation=cv2.INTER_CUBIC)
-            calo[1] = cv2.resize(hcal_pixels, dsize=(300, 300),
+            calo[1] = cv2.resize(hcal_pixels, dsize=(340, 340),
                                  interpolation=cv2.INTER_CUBIC)
 
             calo = np.asarray(calo, dtype=np.float32)
