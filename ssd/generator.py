@@ -6,23 +6,14 @@ import torch
 
 class CalorimeterJetDataset(torch.utils.data.Dataset):
 
-    def __init__(self, hdf5_dataset=None,
-                 l_format=('class_id', 'xmin', 'ymin', 'xmax', 'ymax', 'pt')):
+    def __init__(self, hdf5_dataset=None):
 
         self.hdf5_dataset = hdf5_dataset
-        self.l_format = l_format
 
-        self.offset_phi = 46
+        self.channels = 2  # Number of color channels of the input images
         self.height = 360  # Height of the input images
         self.width = 340  # Width of the input images
-        self.channels = 2  # Number of color channels of the input images
-        # This dictionary is for internal use
-        self.labels_format = {'class_id': l_format.index('class_id'),
-                              'xmin': l_format.index('xmin'),
-                              'ymin': l_format.index('ymin'),
-                              'xmax': l_format.index('xmax'),
-                              'ymax': l_format.index('ymax'),
-                              'pt': l_format.index('pt')}
+        self.offset_phi = 46
 
         self.labels = self.hdf5_dataset['labels']
 
