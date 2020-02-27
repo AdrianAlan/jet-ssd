@@ -31,14 +31,13 @@ class SSD(nn.Module):
         self.num_classes = num_classes
 
         jet = {'num_classes': 2,
-               'lr_steps': (80000, 100000, 120000),
-               'max_iter': 120000,
-               'feature_maps': [43, 21, 11, 6, 4, 2],
-               'min_dim': 340,
-               'steps': [8, 17, 31, 57, 85, 170],
-               'min_sizes': [34, 34, 34, 34, 34, 34],
+               'feature_maps_eta': [43, 21, 11, 6, 4, 2],
+               'feature_maps_phi': [45, 22, 11, 6, 4, 2],
+               'min_dim': (360, 340),
+               'steps_eta': [8, 17, 31, 57, 85, 170],
+               'steps_phi': [8, 17, 33, 60, 90, 180],
+               'min_sizes': [46, 46, 46, 46, 46, 46],
                'max_sizes': [92, 92, 92, 92, 92, 92],
-               'variance': [0.1, 0.2],
                'clip': False,
                'name': 'jet'}
 
@@ -104,6 +103,7 @@ class SSD(nn.Module):
 
         # apply multibox head to source layers
         for (x, l, c) in zip(sources, self.loc, self.conf):
+            # print(x.shape)
             loc.append(l(x).permute(0, 2, 3, 1).contiguous())
             conf.append(c(x).permute(0, 2, 3, 1).contiguous())
 

@@ -56,9 +56,9 @@ class CalorimeterJetDataset(torch.utils.data.Dataset):
         energy = energy / np.max(energy)
 
         if cal == 'ECAL':
-            pixels = np.zeros((360, 340))
+            pixels = np.zeros((self.height, self.width))
         if cal == 'HCAL':
-            pixels = np.zeros((360, 204))
+            pixels = np.zeros((self.height, 204))
 
         pixels[indices_phi, indices_eta] = energy
 
@@ -66,7 +66,7 @@ class CalorimeterJetDataset(torch.utils.data.Dataset):
             pixels = np.hstack((pixels[:, :85],
                                 pixels[:, 85:-85].repeat(5, axis=1),
                                 pixels[:, -85:]))
-        return pixels
+        return np.expand_dims(pixels, axis=0)
 
     def __getitem__(self, index):
 
@@ -98,13 +98,7 @@ class CalorimeterJetDataset(torch.utils.data.Dataset):
                                               hcal_energy,
                                               cal='HCAL')
 
-            # calorimeter = np.rollaxis(calorimeter, 0, 3) # channels last
-            calo = np.zeros((2, 340, 340))
-            calo[0] = cv2.resize(ecal_pixels, dsize=(340, 340),
-                                 interpolation=cv2.INTER_CUBIC)
-            calo[1] = cv2.resize(hcal_pixels, dsize=(340, 340),
-                                 interpolation=cv2.INTER_CUBIC)
-
+            calo = np.append(ecal_pixels, hcal_pixels, axis=0)
             calo = np.asarray(calo, dtype=np.float32)
             calo = torch.from_numpy(calo)
 
