@@ -13,7 +13,6 @@ class CalorimeterJetDataset(torch.utils.data.Dataset):
         self.channels = 2  # Number of color channels of the input images
         self.height = 360  # Height of the input images
         self.width = 340  # Width of the input images
-        self.offset_phi = 46
 
         self.labels = self.hdf5_dataset['labels']
 
@@ -35,29 +34,32 @@ class CalorimeterJetDataset(torch.utils.data.Dataset):
         # Set fractional coordinates
         label_reshaped[:, 0] = label_reshaped[:, 0] / float(self.width)
         label_reshaped[:, 2] = label_reshaped[:, 2] / float(self.width)
-        label_reshaped[:, 1] = label_reshaped[:, 1] - self.offset_phi
         label_reshaped[:, 1] = label_reshaped[:, 1] / float(self.height)
-        label_reshaped[:, 3] = label_reshaped[:, 3] - self.offset_phi
         label_reshaped[:, 3] = label_reshaped[:, 3] / float(self.height)
         label_reshaped[:, 4] = 0.  # label_reshaped[:, 4] - 1. # label
 
-        return torch.from_numpy(label_reshaped)
+        return label_reshaped
 
-    def process_images(self, indices_phi, indices_eta, energy, cal='ECAL'):
-        energy = energy / np.max(energy)
+    def process_images(self,
+                       indices_ecal_phi, indices_hcal_phi,
+                       indices_ecal_eta, indices_hcal_eta,
+                       ecal_energy, hcal_energy):
 
-        if cal == 'ECAL':
-            pixels = np.zeros((self.height, self.width))
-        if cal == 'HCAL':
-            pixels = np.zeros((self.height, 204))
+        ecal_energy = ecal_energy / np.max(ecal_energy)
+        hcal_energy = hcal_energy / np.max(hcal_energy)
 
-        pixels[indices_phi, indices_eta] = energy
+        indices_channels = np.append(np.zeros(len(indices_ecal_phi)),
+                                     np.ones(len(indices_hcal_phi)))
+        indices_phi = np.append(indices_ecal_phi, indices_hcal_phi)
+        indices_eta = np.append(indices_ecal_eta, indices_hcal_eta)
+        energy = np.append(ecal_energy, hcal_energy)
 
-        if cal == 'HCAL':
-            pixels = np.hstack((pixels[:, :85],
-                                pixels[:, 85:-85].repeat(5, axis=1),
-                                pixels[:, -85:]))
-        return np.expand_dims(pixels, axis=0)
+        i = torch.LongTensor([indices_channels, indices_phi, indices_eta])
+        v = torch.FloatTensor(energy)
+        pixels = torch.sparse.FloatTensor(i, v,
+             torch.Size([self.channels, self.height, self.width]))
+        
+        return pixels.to_dense()
 
     def __getitem__(self, index):
 
@@ -68,37 +70,31 @@ class CalorimeterJetDataset(torch.utils.data.Dataset):
 
             # Set labels
             labels_raw = np.asarray([self.labels[index]], dtype=np.float32)
-            labels = self.process_labels(labels_raw)
+            labels_raw = torch.FloatTensor(labels_raw)
+            labels_processed = self.process_labels(labels_raw)
 
             # Load calorimeter
             indices_ecal_phi = np.asarray(self.ecal_phi[index], dtype=np.int16)
             indices_ecal_eta = np.asarray(self.ecal_eta[index], dtype=np.int16)
             ecal_energy = np.asarray(self.ecal_energy[index], dtype=np.float32)
 
-            ecal_pixels = self.process_images(indices_ecal_phi,
-                                              indices_ecal_eta,
-                                              ecal_energy,
-                                              cal='ECAL')
-
             indices_hcal_phi = np.asarray(self.hcal_phi[index], dtype=np.int16)
             indices_hcal_eta = np.asarray(self.hcal_eta[index], dtype=np.int16)
             hcal_energy = np.asarray(self.hcal_energy[index], dtype=np.float32)
 
-            hcal_pixels = self.process_images(indices_hcal_phi,
+            calorimeter = self.process_images(indices_ecal_phi,
+                                              indices_hcal_phi,
+                                              indices_ecal_eta,
                                               indices_hcal_eta,
-                                              hcal_energy,
-                                              cal='HCAL')
+                                              ecal_energy,
+                                              hcal_energy)
 
-            calo = np.append(ecal_pixels, hcal_pixels, axis=0)
-            calo = np.asarray(calo, dtype=np.float32)
-            calo = torch.from_numpy(calo)
-
-            if labels.shape[0]:
+            if labels_processed.shape[0]:
                 repeat = False
             else:
                 index += 1
 
-        return calo, labels
+        return calorimeter, labels_processed
 
     def __len__(self):
         return self.dataset_size
