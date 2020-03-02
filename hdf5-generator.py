@@ -244,11 +244,6 @@ class HDF5Generator:
                 ymin = int(index_phi-self.radius)
                 ymax = int(index_phi+self.radius)
 
-                if xmin < 0:
-                    xmin = 0
-                if xmax > len(self.edges_eta_ecal) - 1:
-                    xmax = len(self.edges_eta_ecal) - 1
-
                 labels.append([self.unique_label, xmin, ymin, xmax, ymax, pt])
 
         return np.asarray(labels)
