@@ -22,7 +22,7 @@ for column in ['labels',
 
     print(column)
 
-    dt = h5py.special_dtype(vlen=np.uint16)
+    dt = h5py.special_dtype(vlen=np.float32)
 
     filtered_dataset = hdf5_dataset.create_dataset(name=column,
                                                    shape=(final_size,),

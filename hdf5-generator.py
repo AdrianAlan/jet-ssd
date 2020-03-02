@@ -104,43 +104,43 @@ class HDF5Generator:
                 name='labels',
                 shape=(self.hdf5_dataset_size,),
                 maxshape=(None),
-                dtype=h5py.special_dtype(vlen=np.uint16))
+                dtype=h5py.special_dtype(vlen=np.int16))
 
         hdf5_ecal_energy = hdf5_dataset.create_dataset(
                 name='ecal_energy',
                 shape=(self.hdf5_dataset_size,),
                 maxshape=(None),
-                dtype=h5py.special_dtype(vlen=np.uint16))
+                dtype=h5py.special_dtype(vlen=np.float32))
 
         hdf5_ecal_phi = hdf5_dataset.create_dataset(
                 name='ecal_phi',
                 shape=(self.hdf5_dataset_size,),
                 maxshape=(None),
-                dtype=h5py.special_dtype(vlen=np.uint16))
+                dtype=h5py.special_dtype(vlen=np.int16))
 
         hdf5_ecal_eta = hdf5_dataset.create_dataset(
                 name='ecal_eta',
                 shape=(self.hdf5_dataset_size,),
                 maxshape=(None),
-                dtype=h5py.special_dtype(vlen=np.uint16))
+                dtype=h5py.special_dtype(vlen=np.int16))
 
         hdf5_hcal_energy = hdf5_dataset.create_dataset(
                 name='hcal_energy',
                 shape=(self.hdf5_dataset_size,),
                 maxshape=(None),
-                dtype=h5py.special_dtype(vlen=np.uint16))
+                dtype=h5py.special_dtype(vlen=np.float32))
 
         hdf5_hcal_phi = hdf5_dataset.create_dataset(
                 name='hcal_phi',
                 shape=(self.hdf5_dataset_size,),
                 maxshape=(None),
-                dtype=h5py.special_dtype(vlen=np.uint16))
+                dtype=h5py.special_dtype(vlen=np.int16))
 
         hdf5_hcal_eta = hdf5_dataset.create_dataset(
                 name='hcal_eta',
                 shape=(self.hdf5_dataset_size,),
                 maxshape=(None),
-                dtype=h5py.special_dtype(vlen=np.uint16))
+                dtype=h5py.special_dtype(vlen=np.int16))
 
         i = 0
 
