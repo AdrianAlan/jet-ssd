@@ -9,6 +9,7 @@ import torch.optim as optim
 import torch.backends.cudnn as cudnn
 import torch.nn.init as init
 import torch.utils.data as data
+import horovod.torch as hvd
 import tqdm
 
 from tqdm import trange
@@ -45,12 +46,6 @@ def xavier(param):
     init.xavier_uniform_(param)
 
 
-if torch.cuda.is_available():
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
-else:
-    torch.set_default_tensor_type('torch.FloatTensor')
-
-
 HOME = pathlib.Path().absolute()
 DATA_SOURCE = '/eos/user/a/adpol/ceva/fast'
 BINARY = False
@@ -83,30 +78,51 @@ else:
 if not os.path.join(HOME, save_folder):
     os.mkdir(os.path.join(HOME, save_folder))
 
+# Initialize Horovod
+hvd.init()
+torch.manual_seed(42)
+
+# Pin GPU to be used to process local rank (one GPU per process)
+torch.cuda.set_device(hvd.local_rank())
+torch.cuda.manual_seed(42)
+
+if torch.cuda.is_available():
+    torch.set_default_tensor_type('torch.cuda.FloatTensor')
+else:
+    torch.set_default_tensor_type('torch.FloatTensor')
+
+
 # Initialize Dataset
 h5_train = h5py.File(train_dataset_path, 'r')
 train_dataset = CalorimeterJetDataset(hdf5_dataset=h5_train)
+# Partition dataset among workers using DistributedSampler
+train_sampler = torch.utils.data.distributed.DistributedSampler(
+    train_dataset, num_replicas=hvd.size(), rank=hvd.rank())
 train_loader = torch.utils.data.DataLoader(train_dataset,
                                            batch_size=batch_size,
                                            collate_fn=detection_collate,
-                                           shuffle=True,
+                                           # shuffle=True,
+                                           sampler=train_sampler,
                                            num_workers=num_workers)
 
 h5_val = h5py.File(val_dataset_path, 'r')
 val_dataset = CalorimeterJetDataset(hdf5_dataset=h5_val)
+val_sampler = torch.utils.data.distributed.DistributedSampler(
+    val_dataset, num_replicas=hvd.size(), rank=hvd.rank())
 val_loader = torch.utils.data.DataLoader(val_dataset,
                                          batch_size=batch_size,
                                          collate_fn=detection_collate,
-                                         shuffle=False,
+                                         # shuffle=False,
+                                         sampler=val_sampler,
                                          num_workers=num_workers)
 
 # Build SSD Network
 ssd_net = build_ssd('train', 300, num_classes + 1, BINARY)
-
+net = ssd_net
 # Data Parallelization
-net = torch.nn.DataParallel(ssd_net)
+# net = torch.nn.DataParallel(ssd_net)
 cudnn.benchmark = True
-net = net.cuda()
+net.cuda()
 
 # Initialize Weights
 ssd_net.vgg.apply(weights_init)
@@ -121,6 +137,14 @@ optimizer = optim.SGD(net.parameters(),
                       lr=lr,
                       momentum=momentum,
                       weight_decay=weight_decay)
+
+# Add Horovod Distributed Optimizer
+optimizer = hvd.DistributedOptimizer(optimizer,
+                                     named_parameters=net.named_parameters())
+# Broadcast parameters from rank 0 to all other processes.
+hvd.broadcast_optimizer_state(optimizer, root_rank=0)
+hvd.broadcast_parameters(net.state_dict(), root_rank=0)
+
 
 criterion = MultiBoxLoss(num_classes+1,
                          0.5,
