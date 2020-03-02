@@ -29,9 +29,6 @@ class PhysicsConstants():
         # Assigned jet classes
         self.classes = {'b': 1, 'q': 5, 't': 4, 'W': 3, 'h': 2}
 
-        # Offset in phi
-        self.offset_phi = self.get_radius_in_pixels('t')
-
         self.example_file = example_file
         self.min_eta = -3
         self.max_eta = 3
@@ -241,8 +238,6 @@ class HDF5Generator:
             if pt > self.minpt:
                 index_phi = np.argmax(self.edges_phi_ecal >= phi) - 1
                 index_eta = np.argmax(self.edges_eta_ecal >= eta) - 1
-
-                index_phi = index_phi + self.constants.offset_phi
 
                 xmin = int(index_eta-self.radius)
                 xmax = int(index_eta+self.radius)
