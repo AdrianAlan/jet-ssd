@@ -211,6 +211,8 @@ class HDF5Generator:
                 hcal_phis, hcal_etas = self.get_energy_map(etas, phis,
                                                            cal='HCAL')
                 hcal_energy = energy[etas_mask]
+                hcal_phis, hcal_etas, hcal_energy = self.hcal_resize(
+                    hcal_phis, hcal_etas, hcal_energy)
 
                 # Push the data to hdf5
                 hdf5_ecal_energy[i] = ecal_energy
@@ -255,6 +257,21 @@ class HDF5Generator:
                 labels.append([self.unique_label, xmin, ymin, xmax, ymax, pt])
 
         return np.asarray(labels)
+
+    def hcal_resize(self, indices_phi, indices_eta, energy):
+        mask = (indices_eta >= 85) & (indices_eta <= 118)
+
+        energy = np.concatenate(
+            [np.repeat(x, 5) if mask[i] else np.array([x]) for i, x
+             in enumerate(energy)])
+        indices_phi = np.concatenate(
+            [np.repeat(x, 5) if mask[i] else np.array([x]) for i, x
+                in enumerate(indices_phi)])
+        indices_eta = np.concatenate(
+            [np.array([e]) if e < 85 else np.array([e + 136])
+                if e > 118 else 5*e-340 + np.arange(5) for e in indices_eta])
+
+        return indices_phi, indices_eta, energy
 
     def get_energy_map(self, etas, phis, cal='ECAL'):
 
